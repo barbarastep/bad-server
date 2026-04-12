@@ -4,6 +4,7 @@ import { COOKIE_SECURE } from '../config'
 import ForbiddenError from '../errors/forbidden-error'
 
 export const CSRF_COOKIE_NAME = 'csrfToken'
+export const LEGACY_CSRF_COOKIE_NAME = '_csrf'
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
@@ -17,14 +18,24 @@ const cookieOptions: CookieOptions = {
 export const issueCsrfToken = (res: Response) => {
     const csrfToken = crypto.randomBytes(32).toString('hex')
     res.cookie(CSRF_COOKIE_NAME, csrfToken, cookieOptions)
+    res.cookie(LEGACY_CSRF_COOKIE_NAME, csrfToken, cookieOptions)
 
     return csrfToken
 }
 
 export const getOrCreateCsrfToken = (req: Request, res: Response) => {
-    const currentToken = req.cookies?.[CSRF_COOKIE_NAME]
+    const currentToken =
+        req.cookies?.[CSRF_COOKIE_NAME] ?? req.cookies?.[LEGACY_CSRF_COOKIE_NAME]
 
     if (currentToken) {
+        if (req.cookies?.[CSRF_COOKIE_NAME] !== currentToken) {
+            res.cookie(CSRF_COOKIE_NAME, currentToken, cookieOptions)
+        }
+
+        if (req.cookies?.[LEGACY_CSRF_COOKIE_NAME] !== currentToken) {
+            res.cookie(LEGACY_CSRF_COOKIE_NAME, currentToken, cookieOptions)
+        }
+
         return currentToken
     }
 
@@ -32,6 +43,7 @@ export const getOrCreateCsrfToken = (req: Request, res: Response) => {
     req.cookies = {
         ...req.cookies,
         [CSRF_COOKIE_NAME]: csrfToken,
+        [LEGACY_CSRF_COOKIE_NAME]: csrfToken,
     }
 
     return csrfToken
@@ -56,8 +68,13 @@ export const requireCsrfToken = (
         return next()
     }
 
-    const cookieToken = req.cookies?.[CSRF_COOKIE_NAME]
-    const headerToken = req.header('X-CSRF-Token')
+    const cookieToken =
+        req.cookies?.[CSRF_COOKIE_NAME] ?? req.cookies?.[LEGACY_CSRF_COOKIE_NAME]
+    const headerToken =
+        req.header('X-CSRF-Token') ??
+        req.header('CSRF-Token') ??
+        req.header('X-XSRF-Token') ??
+        req.body?._csrf
 
     if (!cookieToken || !headerToken || cookieToken !== headerToken) {
         return next(new ForbiddenError('CSRF токен отсутствует или невалиден'))

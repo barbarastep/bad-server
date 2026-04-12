@@ -14,7 +14,8 @@ import User from '../models/user'
 // POST /auth/login
 const login = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const { email, password } = req.body
+        const email = req.body.email ?? req.body.login
+        const { password } = req.body
         const user = await User.findUserByCredentials(email, password)
         const accessToken = user.generateAccessToken()
         const refreshToken = await user.generateRefreshToken()
@@ -89,7 +90,10 @@ const getCurrentUser = async (
 const getCsrfToken = (req: Request, res: Response) => {
     const csrfToken = getOrCreateCsrfToken(req, res)
 
-    return res.status(constants.HTTP_STATUS_OK).json({ csrfToken })
+    return res.status(constants.HTTP_STATUS_OK).json({
+        csrfToken,
+        _csrf: csrfToken,
+    })
 }
 
 // Можно лучше: вынести общую логику получения данных из refresh токена

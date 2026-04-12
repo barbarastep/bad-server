@@ -138,18 +138,21 @@ export const validateCurrentUserUpdateBody = celebrate({
 })
 
 export const validateAuthentication = celebrate({
-    body: Joi.object().keys({
+    body: Joi.object({
         email: Joi.string()
-            .required()
             .email()
-            .message('Поле "email" должно быть валидным email-адресом')
-            .messages({
-                'string.required': 'Поле "email" должно быть заполнено',
-            }),
+            .message('Поле "email" должно быть валидным email-адресом'),
+        login: Joi.string()
+            .email()
+            .message('Поле "login" должно быть валидным email-адресом'),
         password: Joi.string().required().messages({
             'string.empty': 'Поле "password" должно быть заполнено',
         }),
-    }),
+    })
+        .or('email', 'login')
+        .messages({
+            'object.missing': 'Должно быть заполнено поле "email" или "login"',
+        }),
 })
 
 export const validateCustomerUpdateBody = celebrate({
