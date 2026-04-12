@@ -165,13 +165,13 @@ const refreshAccessToken = async (
 }
 
 const getCurrentUserRoles = async (
-    req: Request,
+    _req: Request,
     res: Response,
     next: NextFunction
 ) => {
     const userId = res.locals.user._id
     try {
-        await User.findById(userId, req.body, {
+        await User.findById(userId, null, {
             new: true,
         }).orFail(
             () =>
@@ -191,9 +191,19 @@ const updateCurrentUser = async (
     next: NextFunction
 ) => {
     const userId = res.locals.user._id
+    const allowedFields = ['name', 'phone'] as const
+    const payload = allowedFields.reduce<Record<string, unknown>>((acc, field) => {
+        if (typeof req.body[field] !== 'undefined') {
+            acc[field] = req.body[field]
+        }
+
+        return acc
+    }, {})
+
     try {
-        const updatedUser = await User.findByIdAndUpdate(userId, req.body, {
+        const updatedUser = await User.findByIdAndUpdate(userId, payload, {
             new: true,
+            runValidators: true,
         }).orFail(
             () =>
                 new NotFoundError(

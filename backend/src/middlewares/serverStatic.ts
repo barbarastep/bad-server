@@ -1,22 +1,33 @@
 import { NextFunction, Request, Response } from 'express'
 import fs from 'fs'
 import path from 'path'
+import ForbiddenError from '../errors/forbidden-error'
 
 export default function serveStatic(baseDir: string) {
-    return (req: Request, res: Response, next: NextFunction) => {
-        // Определяем полный путь к запрашиваемому файлу
-        const filePath = path.join(baseDir, req.path)
+    const normalizedBaseDir = path.resolve(baseDir)
 
-        // Проверяем, существует ли файл
+    return (req: Request, res: Response, next: NextFunction) => {
+        let relativePath = req.path
+
+        try {
+            relativePath = decodeURIComponent(req.path)
+        } catch (error) {
+            return next(error)
+        }
+
+        const filePath = path.resolve(normalizedBaseDir, `.${relativePath}`)
+
+        if (!filePath.startsWith(normalizedBaseDir)) {
+            return next(new ForbiddenError('Доступ к файлу запрещен'))
+        }
+
         fs.access(filePath, fs.constants.F_OK, (err) => {
             if (err) {
-                // Файл не существует отдаем дальше мидлварам
                 return next()
             }
-            // Файл существует, отправляем его клиенту
-            return res.sendFile(filePath, (err) => {
-                if (err) {
-                    next(err)
+            return res.sendFile(filePath, (sendFileError) => {
+                if (sendFileError) {
+                    next(sendFileError)
                 }
             })
         })

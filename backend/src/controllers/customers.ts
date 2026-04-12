@@ -3,6 +3,7 @@ import { FilterQuery } from 'mongoose'
 import NotFoundError from '../errors/not-found-error'
 import Order from '../models/order'
 import User, { IUser } from '../models/user'
+import { getDateQueryValue, getNumberQueryValue, getSafeSearchRegex, getSingleQueryValue } from '../utils/request'
 
 // TODO: Добавить guard admin
 // eslint-disable-next-line max-len
@@ -13,33 +14,41 @@ export const getCustomers = async (
     next: NextFunction
 ) => {
     try {
-        const {
-            page = 1,
-            limit = 10,
-            sortField = 'createdAt',
-            sortOrder = 'desc',
-            registrationDateFrom,
-            registrationDateTo,
-            lastOrderDateFrom,
-            lastOrderDateTo,
-            totalAmountFrom,
-            totalAmountTo,
-            orderCountFrom,
-            orderCountTo,
-            search,
-        } = req.query
+        const page = getNumberQueryValue(req.query.page, 1, {
+            min: 1,
+            max: 1000,
+        })
+        const limit = getNumberQueryValue(req.query.limit, 10, {
+            min: 1,
+            max: 50,
+        })
+        const sortField =
+            getSingleQueryValue(req.query.sortField) || 'createdAt'
+        const sortOrder =
+            getSingleQueryValue(req.query.sortOrder) === 'asc' ? 'asc' : 'desc'
+        const registrationDateFrom = getDateQueryValue(
+            req.query.registrationDateFrom
+        )
+        const registrationDateTo = getDateQueryValue(req.query.registrationDateTo)
+        const lastOrderDateFrom = getDateQueryValue(req.query.lastOrderDateFrom)
+        const lastOrderDateTo = getDateQueryValue(req.query.lastOrderDateTo)
+        const totalAmountFrom = getSingleQueryValue(req.query.totalAmountFrom)
+        const totalAmountTo = getSingleQueryValue(req.query.totalAmountTo)
+        const orderCountFrom = getSingleQueryValue(req.query.orderCountFrom)
+        const orderCountTo = getSingleQueryValue(req.query.orderCountTo)
+        const search = getSingleQueryValue(req.query.search)
 
         const filters: FilterQuery<Partial<IUser>> = {}
 
         if (registrationDateFrom) {
             filters.createdAt = {
                 ...filters.createdAt,
-                $gte: new Date(registrationDateFrom as string),
+                $gte: registrationDateFrom,
             }
         }
 
         if (registrationDateTo) {
-            const endOfDay = new Date(registrationDateTo as string)
+            const endOfDay = new Date(registrationDateTo)
             endOfDay.setHours(23, 59, 59, 999)
             filters.createdAt = {
                 ...filters.createdAt,
@@ -50,12 +59,12 @@ export const getCustomers = async (
         if (lastOrderDateFrom) {
             filters.lastOrderDate = {
                 ...filters.lastOrderDate,
-                $gte: new Date(lastOrderDateFrom as string),
+                $gte: lastOrderDateFrom,
             }
         }
 
         if (lastOrderDateTo) {
-            const endOfDay = new Date(lastOrderDateTo as string)
+            const endOfDay = new Date(lastOrderDateTo)
             endOfDay.setHours(23, 59, 59, 999)
             filters.lastOrderDate = {
                 ...filters.lastOrderDate,
@@ -92,32 +101,44 @@ export const getCustomers = async (
         }
 
         if (search) {
-            const searchRegex = new RegExp(search as string, 'i')
-            const orders = await Order.find(
-                {
-                    $or: [{ deliveryAddress: searchRegex }],
-                },
-                '_id'
-            )
+            const searchRegex = getSafeSearchRegex(search)
 
-            const orderIds = orders.map((order) => order._id)
+            if (searchRegex) {
+                const orders = await Order.find(
+                    {
+                        $or: [{ deliveryAddress: searchRegex }],
+                    },
+                    '_id'
+                )
 
-            filters.$or = [
-                { name: searchRegex },
-                { lastOrder: { $in: orderIds } },
-            ]
+                const orderIds = orders.map((order) => order._id)
+
+                filters.$or = [
+                    { name: searchRegex },
+                    { lastOrder: { $in: orderIds } },
+                ]
+            }
         }
 
         const sort: { [key: string]: any } = {}
+        const allowedSortFields = new Set([
+            'createdAt',
+            'lastOrderDate',
+            'totalAmount',
+            'orderCount',
+            'name',
+        ])
 
-        if (sortField && sortOrder) {
-            sort[sortField as string] = sortOrder === 'desc' ? -1 : 1
+        if (allowedSortFields.has(sortField)) {
+            sort[sortField] = sortOrder === 'desc' ? -1 : 1
+        } else {
+            sort.createdAt = -1
         }
 
         const options = {
             sort,
-            skip: (Number(page) - 1) * Number(limit),
-            limit: Number(limit),
+            skip: (page - 1) * limit,
+            limit,
         }
 
         const users = await User.find(filters, null, options).populate([
@@ -144,8 +165,8 @@ export const getCustomers = async (
             pagination: {
                 totalUsers,
                 totalPages,
-                currentPage: Number(page),
-                pageSize: Number(limit),
+                currentPage: page,
+                pageSize: limit,
             },
         })
     } catch (error) {
@@ -178,12 +199,22 @@ export const updateCustomer = async (
     res: Response,
     next: NextFunction
 ) => {
+    const allowedFields = ['name', 'email', 'phone', 'roles'] as const
+    const payload = allowedFields.reduce<Record<string, unknown>>((acc, field) => {
+        if (typeof req.body[field] !== 'undefined') {
+            acc[field] = req.body[field]
+        }
+
+        return acc
+    }, {})
+
     try {
         const updatedUser = await User.findByIdAndUpdate(
             req.params.id,
-            req.body,
+            payload,
             {
                 new: true,
+                runValidators: true,
             }
         )
             .orFail(

@@ -2,8 +2,10 @@ import { ordersActions, ordersSelector } from '@slices/orders'
 import { useActionCreators, useDispatch, useSelector } from '@store/hooks'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchOrdersWithFilters } from '../../services/slice/orders/thunk'
+import { FiltersOrder } from '../../services/slice/orders/type'
 import { AppRoute } from '../../utils/constants'
 import Filter from '../filter'
+import { FilterValue } from '../filter/helpers/types'
 import styles from './admin.module.scss'
 import { ordersFilterFields } from './helpers/ordersFilterFields'
 
@@ -15,13 +17,27 @@ export default function AdminFilterOrders() {
     const { updateFilter, clearFilters } = useActionCreators(ordersActions)
     const filterOrderOption = useSelector(ordersSelector.selectFilterOption)
 
-    const handleFilter = (filters: Record<string, any>) => {
-        dispatch(updateFilter({ ...filters, status: filters.status.value }))
+    const handleFilter = (filters: Record<string, FilterValue>) => {
+        const normalizedFilters = Object.entries(filters).reduce<
+            Partial<FiltersOrder>
+        >((acc, [key, value]) => {
+            if (typeof value === 'object' && value) {
+                acc[key as keyof FiltersOrder] = value.value as never
+            } else if (typeof value !== 'undefined') {
+                acc[key as keyof FiltersOrder] = value as never
+            }
+
+            return acc
+        }, {})
+
+        dispatch(updateFilter(normalizedFilters))
         const queryParams: { [key: string]: string } = {}
         Object.entries(filters).forEach(([key, value]) => {
             if (value) {
                 queryParams[key] =
-                    typeof value === 'object' ? value.value : value.toString()
+                    typeof value === 'object'
+                        ? value.value.toString()
+                        : value.toString()
             }
         })
         setSearchParams(queryParams)

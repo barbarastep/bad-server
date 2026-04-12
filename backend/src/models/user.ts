@@ -1,5 +1,6 @@
 /* eslint-disable no-param-reassign */
 import crypto from 'crypto'
+import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import mongoose, { Document, HydratedDocument, Model, Types } from 'mongoose'
 import validator from 'validator'
@@ -7,6 +8,9 @@ import md5 from 'md5'
 
 import { ACCESS_TOKEN, REFRESH_TOKEN } from '../config'
 import UnauthorizedError from '../errors/unauthorized-error'
+
+const BCRYPT_SALT_ROUNDS = 12
+const LEGACY_MD5_HASH = /^[a-f0-9]{32}$/i
 
 export enum Role {
     Customer = 'customer',
@@ -116,8 +120,8 @@ const userSchema = new mongoose.Schema<IUser, IUserModel, IUserMethods>(
 // Возможно добавление хеша в контроллере регистрации
 userSchema.pre('save', async function hashingPassword(next) {
     try {
-        if (this.isModified('password')) {
-            this.password = md5(this.password)
+        if (this.isModified('password') && !this.password.startsWith('$2')) {
+            this.password = await bcrypt.hash(this.password, BCRYPT_SALT_ROUNDS)
         }
         next()
     } catch (error) {
@@ -178,12 +182,23 @@ userSchema.statics.findUserByCredentials = async function findByCredentials(
     const user = await this.findOne({ email })
         .select('+password')
         .orFail(() => new UnauthorizedError('Неправильные почта или пароль'))
-    const passwdMatch = md5(password) === user.password
-    if (!passwdMatch) {
-        return Promise.reject(
-            new UnauthorizedError('Неправильные почта или пароль')
-        )
+
+    const bcryptMatch = await bcrypt.compare(password, user.password)
+
+    if (bcryptMatch) {
+        return user
     }
+
+    const isLegacyHash = LEGACY_MD5_HASH.test(user.password)
+    const legacyMatch = isLegacyHash && md5(password) === user.password
+
+    if (!legacyMatch) {
+        throw new UnauthorizedError('Неправильные почта или пароль')
+    }
+
+    user.password = password
+    await user.save()
+
     return user
 }
 

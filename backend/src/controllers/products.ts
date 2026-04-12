@@ -7,25 +7,34 @@ import ConflictError from '../errors/conflict-error'
 import NotFoundError from '../errors/not-found-error'
 import Product from '../models/product'
 import movingFile from '../utils/movingFile'
+import { assertPublicFilePath } from '../utils/public-file'
+import { getNumberQueryValue } from '../utils/request'
 
 // GET /product
 const getProducts = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const { page = 1, limit = 5 } = req.query
+        const page = getNumberQueryValue(req.query.page, 1, {
+            min: 1,
+            max: 1000,
+        })
+        const limit = getNumberQueryValue(req.query.limit, 5, {
+            min: 1,
+            max: 50,
+        })
         const options = {
-            skip: (Number(page) - 1) * Number(limit),
-            limit: Number(limit),
+            skip: (page - 1) * limit,
+            limit,
         }
         const products = await Product.find({}, null, options)
         const totalProducts = await Product.countDocuments({})
-        const totalPages = Math.ceil(totalProducts / Number(limit))
+        const totalPages = Math.ceil(totalProducts / limit)
         return res.send({
             items: products,
             pagination: {
                 totalProducts,
                 totalPages,
-                currentPage: Number(page),
-                pageSize: Number(limit),
+                currentPage: page,
+                pageSize: limit,
             },
         })
     } catch (err) {
@@ -41,11 +50,17 @@ const createProduct = async (
 ) => {
     try {
         const { description, category, price, title, image } = req.body
+        const safeImage = image
+            ? {
+                  ...image,
+                  fileName: assertPublicFilePath(image.fileName),
+              }
+            : image
 
         // Переносим картинку из временной папки
-        if (image) {
+        if (safeImage) {
             movingFile(
-                image.fileName,
+                safeImage.fileName,
                 join(__dirname, `../public/${process.env.UPLOAD_PATH_TEMP}`),
                 join(__dirname, `../public/${process.env.UPLOAD_PATH}`)
             )
@@ -53,7 +68,7 @@ const createProduct = async (
 
         const product = await Product.create({
             description,
-            image,
+            image: safeImage,
             category,
             price,
             title,
@@ -82,11 +97,17 @@ const updateProduct = async (
     try {
         const { productId } = req.params
         const { image } = req.body
+        const safeImage = image
+            ? {
+                  ...image,
+                  fileName: assertPublicFilePath(image.fileName),
+              }
+            : image
 
         // Переносим картинку из временной папки
-        if (image) {
+        if (safeImage) {
             movingFile(
-                image.fileName,
+                safeImage.fileName,
                 join(__dirname, `../public/${process.env.UPLOAD_PATH_TEMP}`),
                 join(__dirname, `../public/${process.env.UPLOAD_PATH}`)
             )
@@ -98,7 +119,7 @@ const updateProduct = async (
                 $set: {
                     ...req.body,
                     price: req.body.price ? req.body.price : null,
-                    image: req.body.image ? req.body.image : undefined,
+                    image: safeImage || undefined,
                 },
             },
             { runValidators: true, new: true }
