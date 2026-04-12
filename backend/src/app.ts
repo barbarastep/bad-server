@@ -10,6 +10,7 @@ import { ensureCsrfCookie, requireCsrfToken } from './middlewares/csrf'
 import errorHandler from './middlewares/error-handler'
 import rateLimitMiddleware from './middlewares/rate-limit'
 import serveStatic from './middlewares/serverStatic'
+import ForbiddenError from './errors/forbidden-error'
 import routes from './routes'
 
 const { PORT = 3000 } = process.env
@@ -19,6 +20,18 @@ const allowedOrigins = new Set([
     'http://localhost',
     'https://localhost',
 ])
+const corsOptions = {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+        if (!origin || allowedOrigins.has(origin)) {
+            return callback(null, true)
+        }
+
+        return callback(new ForbiddenError('Запрос с этого источника запрещен'))
+    },
+    credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'CSRF-Token', 'X-XSRF-Token'],
+}
 
 mongoose.set('sanitizeFilter', true)
 mongoose.set('strictQuery', true)
@@ -27,27 +40,18 @@ app.disable('x-powered-by')
 app.use(cookieParser())
 
 app.use(
-    cors({
-        origin: (origin, callback) => {
-            if (!origin || allowedOrigins.has(origin)) {
-                return callback(null, true)
-            }
-
-            return callback(new Error('Запрос с этого источника запрещен'))
-        },
-        credentials: true,
-    })
+    cors(corsOptions)
 )
 
 app.use(serveStatic(path.join(__dirname, 'public')))
 
 app.use(rateLimitMiddleware)
 app.use(ensureCsrfCookie)
-app.use(json({ limit: '32kb' }))
-app.use(urlencoded({ extended: true, limit: '32kb' }))
+app.use(json({ limit: '10kb' }))
+app.use(urlencoded({ extended: true, limit: '10kb' }))
 app.use(requireCsrfToken)
 
-app.options('*', cors({ origin: true, credentials: true }))
+app.options('*', cors(corsOptions))
 app.use(routes)
 app.use(errors())
 app.use(errorHandler)

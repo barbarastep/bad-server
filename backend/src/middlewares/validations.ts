@@ -1,8 +1,17 @@
 import { Joi, celebrate } from 'celebrate'
 import { Types } from 'mongoose'
 
-// eslint-disable-next-line no-useless-escape
-export const phoneRegExp = /^(\+\d+)?(?:\s|-?|\(?\d+\)?)+$/
+export const phoneRegExp = /^\+?[0-9()\-\s]{5,25}$/
+
+export function isSafePhone(value: string) {
+    if (!phoneRegExp.test(value)) {
+        return false
+    }
+
+    const digits = value.replace(/\D/g, '')
+
+    return digits.length >= 5 && digits.length <= 15
+}
 
 export enum PaymentType {
     Card = 'card',
@@ -40,7 +49,15 @@ export const validateOrderBody = celebrate({
         }),
         phone: Joi.string()
             .required()
-            .pattern(phoneRegExp)
+            .custom((value, helpers) => {
+                if (isSafePhone(value)) {
+                    return value
+                }
+
+                return helpers.message({
+                    custom: 'Поле "phone" должно быть валидным телефоном.',
+                })
+            })
             .max(25)
             .messages({
                 'string.empty': 'Не указан телефон',
@@ -133,7 +150,17 @@ export const validateUserBody = celebrate({
 export const validateCurrentUserUpdateBody = celebrate({
     body: Joi.object().keys({
         name: Joi.string().min(2).max(30),
-        phone: Joi.string().pattern(phoneRegExp).max(25),
+        phone: Joi.string()
+            .custom((value, helpers) => {
+                if (isSafePhone(value)) {
+                    return value
+                }
+
+                return helpers.message({
+                    custom: 'Поле "phone" должно быть валидным телефоном.',
+                })
+            })
+            .max(25),
     }),
 })
 
@@ -159,7 +186,17 @@ export const validateCustomerUpdateBody = celebrate({
     body: Joi.object().keys({
         name: Joi.string().min(2).max(30),
         email: Joi.string().email(),
-        phone: Joi.string().pattern(phoneRegExp).max(25),
+        phone: Joi.string()
+            .custom((value, helpers) => {
+                if (isSafePhone(value)) {
+                    return value
+                }
+
+                return helpers.message({
+                    custom: 'Поле "phone" должно быть валидным телефоном.',
+                })
+            })
+            .max(25),
         roles: Joi.array().items(Joi.string().valid('customer', 'admin')).max(2),
     }),
 })

@@ -7,8 +7,8 @@ type Bucket = {
 }
 
 const WINDOW_MS = 60 * 1000
-const GLOBAL_LIMIT = 600
-const AUTH_LIMIT = 60
+const GLOBAL_LIMIT = 20
+const AUTH_LIMIT = 10
 
 const buckets = new Map<string, Bucket>()
 

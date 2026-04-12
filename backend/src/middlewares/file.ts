@@ -2,7 +2,7 @@ import { Request, Express } from 'express'
 import multer, { FileFilterCallback } from 'multer'
 import crypto from 'crypto'
 import { mkdirSync } from 'fs'
-import { extname, join } from 'path'
+import { basename, extname, join } from 'path'
 import BadRequestError from '../errors/bad-request-error'
 
 type DestinationCallback = (error: Error | null, destination: string) => void
@@ -51,7 +51,7 @@ const fileFilter = (
     file: Express.Multer.File,
     cb: FileFilterCallback
 ) => {
-    const extension = extname(file.originalname).toLowerCase()
+    const extension = extname(basename(file.originalname)).toLowerCase()
     const expectedExtension = mimeToExtension[file.mimetype]
 
     if (!expectedExtension || extension !== expectedExtension) {
@@ -67,7 +67,7 @@ export default multer({
     storage,
     fileFilter,
     limits: {
-        fileSize: 5 * 1024 * 1024,
+        fileSize: 10 * 1024 * 1024,
         files: 1,
         parts: 10,
     },

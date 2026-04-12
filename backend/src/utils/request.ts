@@ -1,6 +1,11 @@
 import escapeRegExp from './escapeRegExp'
+import BadRequestError from '../errors/bad-request-error'
 
 export function getSingleQueryValue(value: unknown) {
+    if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
+        throw new BadRequestError('Передан невалидный параметр запроса')
+    }
+
     if (typeof value !== 'string') {
         return undefined
     }

@@ -20,7 +20,7 @@ export const getCustomers = async (
         })
         const limit = getNumberQueryValue(req.query.limit, 10, {
             min: 1,
-            max: 50,
+            max: 10,
         })
         const sortField =
             getSingleQueryValue(req.query.sortField) || 'createdAt'

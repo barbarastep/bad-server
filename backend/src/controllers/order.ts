@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express'
 import { FilterQuery, Error as MongooseError, Types } from 'mongoose'
+import validator from 'validator'
 import BadRequestError from '../errors/bad-request-error'
 import NotFoundError from '../errors/not-found-error'
 import Order, { IOrder, StatusType } from '../models/order'
@@ -22,7 +23,7 @@ export const getOrders = async (
         })
         const limit = getNumberQueryValue(req.query.limit, 10, {
             min: 1,
-            max: 50,
+            max: 10,
         })
         const sortField =
             getSingleQueryValue(req.query.sortField) || 'createdAt'
@@ -177,7 +178,7 @@ export const getOrdersCurrentUser = async (
         })
         const limit = getNumberQueryValue(req.query.limit, 5, {
             min: 1,
-            max: 50,
+            max: 10,
         })
         const options = {
             skip: (page - 1) * limit,
@@ -318,6 +319,8 @@ export const createOrder = async (
         const userId = res.locals.user._id
         const { address, payment, phone, total, email, items, comment } =
             req.body
+        const safeComment =
+            typeof comment === 'string' ? validator.escape(comment) : ''
 
         items.forEach((id: Types.ObjectId) => {
             const product = products.find((p) => p._id.equals(id))
@@ -340,7 +343,7 @@ export const createOrder = async (
             payment,
             phone,
             email,
-            comment,
+            comment: safeComment,
             customer: userId,
             deliveryAddress: address,
         })

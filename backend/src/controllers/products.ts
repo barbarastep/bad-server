@@ -19,7 +19,7 @@ const getProducts = async (req: Request, res: Response, next: NextFunction) => {
         })
         const limit = getNumberQueryValue(req.query.limit, 5, {
             min: 1,
-            max: 50,
+            max: 10,
         })
         const options = {
             skip: (page - 1) * limit,

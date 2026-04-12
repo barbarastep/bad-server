@@ -70,11 +70,13 @@ export const requireCsrfToken = (
 
     const cookieToken =
         req.cookies?.[CSRF_COOKIE_NAME] ?? req.cookies?.[LEGACY_CSRF_COOKIE_NAME]
+    // eslint-disable-next-line dot-notation
+    const legacyBodyToken = req.body?.['_csrf']
     const headerToken =
         req.header('X-CSRF-Token') ??
         req.header('CSRF-Token') ??
         req.header('X-XSRF-Token') ??
-        req.body?._csrf
+        legacyBodyToken
 
     if (!cookieToken || !headerToken || cookieToken !== headerToken) {
         return next(new ForbiddenError('CSRF токен отсутствует или невалиден'))
