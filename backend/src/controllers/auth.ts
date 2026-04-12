@@ -8,6 +8,7 @@ import BadRequestError from '../errors/bad-request-error'
 import ConflictError from '../errors/conflict-error'
 import NotFoundError from '../errors/not-found-error'
 import UnauthorizedError from '../errors/unauthorized-error'
+import { getOrCreateCsrfToken } from '../middlewares/csrf'
 import User from '../models/user'
 
 // POST /auth/login
@@ -82,6 +83,13 @@ const getCurrentUser = async (
     } catch (error) {
         next(error)
     }
+}
+
+// GET /auth/csrf-token
+const getCsrfToken = (req: Request, res: Response) => {
+    const csrfToken = getOrCreateCsrfToken(req, res)
+
+    return res.status(constants.HTTP_STATUS_OK).json({ csrfToken })
 }
 
 // Можно лучше: вынести общую логику получения данных из refresh токена
@@ -217,6 +225,7 @@ const updateCurrentUser = async (
 }
 
 export {
+    getCsrfToken,
     getCurrentUser,
     getCurrentUserRoles,
     login,

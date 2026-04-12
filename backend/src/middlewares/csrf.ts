@@ -14,19 +14,35 @@ const cookieOptions: CookieOptions = {
     path: '/',
 }
 
+export const issueCsrfToken = (res: Response) => {
+    const csrfToken = crypto.randomBytes(32).toString('hex')
+    res.cookie(CSRF_COOKIE_NAME, csrfToken, cookieOptions)
+
+    return csrfToken
+}
+
+export const getOrCreateCsrfToken = (req: Request, res: Response) => {
+    const currentToken = req.cookies?.[CSRF_COOKIE_NAME]
+
+    if (currentToken) {
+        return currentToken
+    }
+
+    const csrfToken = issueCsrfToken(res)
+    req.cookies = {
+        ...req.cookies,
+        [CSRF_COOKIE_NAME]: csrfToken,
+    }
+
+    return csrfToken
+}
+
 export const ensureCsrfCookie = (
     req: Request,
     res: Response,
     next: NextFunction
 ) => {
-    const currentToken = req.cookies?.[CSRF_COOKIE_NAME]
-
-    if (currentToken) {
-        return next()
-    }
-
-    const csrfToken = crypto.randomBytes(32).toString('hex')
-    res.cookie(CSRF_COOKIE_NAME, csrfToken, cookieOptions)
+    getOrCreateCsrfToken(req, res)
 
     return next()
 }
