@@ -5,6 +5,25 @@ import Order from '../models/order'
 import User, { IUser } from '../models/user'
 import { getDateQueryValue, getNumberQueryValue, getSafeSearchRegex, getSingleQueryValue } from '../utils/request'
 
+function getCustomerSearchQueryValue(value: unknown) {
+    if (typeof value === 'string') {
+        const trimmedValue = value.trim()
+
+        return trimmedValue.length ? trimmedValue : undefined
+    }
+
+    if (Array.isArray(value)) {
+        const joinedValue = value
+            .filter((item): item is string => typeof item === 'string')
+            .join(' ')
+            .trim()
+
+        return joinedValue.length ? joinedValue : undefined
+    }
+
+    return undefined
+}
+
 // TODO: Добавить guard admin
 // eslint-disable-next-line max-len
 // Get GET /customers?page=2&limit=5&sort=totalAmount&order=desc&registrationDateFrom=2023-01-01&registrationDateTo=2023-12-31&lastOrderDateFrom=2023-01-01&lastOrderDateTo=2023-12-31&totalAmountFrom=100&totalAmountTo=1000&orderCountFrom=1&orderCountTo=10
@@ -36,7 +55,7 @@ export const getCustomers = async (
         const totalAmountTo = getSingleQueryValue(req.query.totalAmountTo)
         const orderCountFrom = getSingleQueryValue(req.query.orderCountFrom)
         const orderCountTo = getSingleQueryValue(req.query.orderCountTo)
-        const search = getSingleQueryValue(req.query.search)
+        const search = getCustomerSearchQueryValue(req.query.search)
 
         const filters: FilterQuery<Partial<IUser>> = {}
 

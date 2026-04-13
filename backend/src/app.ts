@@ -15,8 +15,10 @@ import routes from './routes'
 
 const { PORT = 3000 } = process.env
 const app = express()
+const defaultCorsOrigin = 'http://localhost:5173'
 const allowedOrigins = new Set([
     ORIGIN_ALLOW,
+    defaultCorsOrigin,
     'http://localhost',
     'https://localhost',
 ])
@@ -42,6 +44,14 @@ app.use(cookieParser())
 app.use(
     cors(corsOptions)
 )
+
+app.use((_req, res, next) => {
+    if (!res.getHeader('Access-Control-Allow-Origin')) {
+        res.header('Access-Control-Allow-Origin', defaultCorsOrigin)
+    }
+
+    return next()
+})
 
 app.use(serveStatic(path.join(__dirname, 'public')))
 
