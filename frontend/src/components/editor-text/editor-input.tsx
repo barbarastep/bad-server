@@ -1,10 +1,4 @@
-import {
-    ContentEditableEvent,
-    createButton,
-    Editor,
-    EditorProvider,
-    Toolbar,
-} from 'react-simple-wysiwyg'
+import { ChangeEvent } from 'react'
 import './editor-input.scss'
 
 type EditorInputProps = {
@@ -13,38 +7,19 @@ type EditorInputProps = {
 }
 
 export default function EditorInput({ onChange, value }: EditorInputProps) {
-    function handleChangeElement(e: ContentEditableEvent) {
+    function handleChangeElement(e: ChangeEvent<HTMLTextAreaElement>) {
         onChange(e.target.value)
     }
 
-    const BtnLinkCustom = createButton(
-        'Вставить ссылку',
-        '🔗',
-        ({ $selection }) => {
-            if ($selection?.nodeName === 'A') {
-                document.execCommand('unlink')
-            } else {
-                // eslint-disable-next-line no-alert
-                document.execCommand(
-                    'createLink',
-                    false,
-                    prompt('URL', '') || undefined
-                )
-            }
-        }
-    )
-
     return (
         <div className='customEditor'>
-            <EditorProvider>
-                <Editor value={value} onChange={handleChangeElement}>
-                    <Toolbar>
-                        <span className='rsw-link-title'>
-                            Вставить ссылку <BtnLinkCustom />
-                        </span>
-                    </Toolbar>
-                </Editor>
-            </EditorProvider>
+            <textarea
+                className='rsw-editor'
+                value={value}
+                onChange={handleChangeElement}
+                maxLength={1000}
+                placeholder='Комментарий к заказу'
+            />
         </div>
     )
 }

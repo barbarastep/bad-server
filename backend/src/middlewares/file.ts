@@ -1,7 +1,9 @@
 import { Request, Express } from 'express'
 import multer, { FileFilterCallback } from 'multer'
+import crypto from 'crypto'
 import { mkdirSync } from 'fs'
-import { join } from 'path'
+import { basename, extname, join } from 'path'
+import BadRequestError from '../errors/bad-request-error'
 
 type DestinationCallback = (error: Error | null, destination: string) => void
 type FileNameCallback = (error: Error | null, filename: string) => void
@@ -29,28 +31,44 @@ const storage = multer.diskStorage({
         file: Express.Multer.File,
         cb: FileNameCallback
     ) => {
-        cb(null, file.originalname)
+        const extension = extname(file.originalname).toLowerCase()
+        const safeName = `${crypto.randomUUID()}${extension}`
+
+        cb(null, safeName)
     },
 })
 
-const types = [
-    'image/png',
-    'image/jpg',
-    'image/jpeg',
-    'image/gif',
-    'image/svg+xml',
-]
+const mimeToExtension: Record<string, string> = {
+    'image/png': '.png',
+    'image/jpg': '.jpg',
+    'image/jpeg': '.jpeg',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+}
 
 const fileFilter = (
     _req: Request,
     file: Express.Multer.File,
     cb: FileFilterCallback
 ) => {
-    if (!types.includes(file.mimetype)) {
-        return cb(null, false)
+    const extension = extname(basename(file.originalname)).toLowerCase()
+    const expectedExtension = mimeToExtension[file.mimetype]
+
+    if (!expectedExtension || extension !== expectedExtension) {
+        return cb(
+            new BadRequestError('Можно загружать только png, jpg, jpeg, gif и webp')
+        )
     }
 
     return cb(null, true)
 }
 
-export default multer({ storage, fileFilter })
+export default multer({
+    storage,
+    fileFilter,
+    limits: {
+        fileSize: 10 * 1024 * 1024,
+        files: 1,
+        parts: 10,
+    },
+})

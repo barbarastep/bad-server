@@ -37,12 +37,11 @@ import ProfilePage from '@pages/profile'
 import RegisterPage from '@pages/register/register-page'
 import { userActions } from '@slices/user'
 import { useActionCreators } from '@store/hooks'
-import store, { persistor } from '@store/store'
+import store from '@store/store'
 import { PropsWithChildren, useEffect } from 'react'
 import { Provider } from 'react-redux'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
-import { PersistGate } from 'redux-persist/integration/react'
 import AdminCustomerDetail from '../admin/admin-customer-detail'
 import ProfileOrderDetail from '../profile/profile-order-detail'
 
@@ -338,7 +337,7 @@ const RouteComponent = () => {
 
 const ProviderComponent = ({ children }: PropsWithChildren) => (
     <Provider store={store}>
-        <PersistGate persistor={persistor}>{children}</PersistGate>
+        {children}
         <ToastContainer
             position='top-right'
             autoClose={5e3}

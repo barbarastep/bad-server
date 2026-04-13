@@ -8,12 +8,14 @@ import BadRequestError from '../errors/bad-request-error'
 import ConflictError from '../errors/conflict-error'
 import NotFoundError from '../errors/not-found-error'
 import UnauthorizedError from '../errors/unauthorized-error'
+import { getOrCreateCsrfToken } from '../middlewares/csrf'
 import User from '../models/user'
 
 // POST /auth/login
 const login = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const { email, password } = req.body
+        const email = req.body.email ?? req.body.login
+        const { password } = req.body
         const user = await User.findUserByCredentials(email, password)
         const accessToken = user.generateAccessToken()
         const refreshToken = await user.generateRefreshToken()
@@ -82,6 +84,16 @@ const getCurrentUser = async (
     } catch (error) {
         next(error)
     }
+}
+
+// GET /auth/csrf-token
+const getCsrfToken = (req: Request, res: Response) => {
+    const csrfToken = getOrCreateCsrfToken(req, res)
+
+    return res.status(constants.HTTP_STATUS_OK).json({
+        csrfToken,
+        _csrf: csrfToken,
+    })
 }
 
 // Можно лучше: вынести общую логику получения данных из refresh токена
@@ -165,13 +177,13 @@ const refreshAccessToken = async (
 }
 
 const getCurrentUserRoles = async (
-    req: Request,
+    _req: Request,
     res: Response,
     next: NextFunction
 ) => {
     const userId = res.locals.user._id
     try {
-        await User.findById(userId, req.body, {
+        await User.findById(userId, null, {
             new: true,
         }).orFail(
             () =>
@@ -191,9 +203,19 @@ const updateCurrentUser = async (
     next: NextFunction
 ) => {
     const userId = res.locals.user._id
+    const allowedFields = ['name', 'phone'] as const
+    const payload = allowedFields.reduce<Record<string, unknown>>((acc, field) => {
+        if (typeof req.body[field] !== 'undefined') {
+            acc[field] = req.body[field]
+        }
+
+        return acc
+    }, {})
+
     try {
-        const updatedUser = await User.findByIdAndUpdate(userId, req.body, {
+        const updatedUser = await User.findByIdAndUpdate(userId, payload, {
             new: true,
+            runValidators: true,
         }).orFail(
             () =>
                 new NotFoundError(
@@ -207,6 +229,7 @@ const updateCurrentUser = async (
 }
 
 export {
+    getCsrfToken,
     getCurrentUser,
     getCurrentUserRoles,
     login,

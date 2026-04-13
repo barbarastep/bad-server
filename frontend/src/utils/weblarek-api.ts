@@ -65,10 +65,21 @@ class Api {
         }
     }
 
+    protected getCsrfHeaders(): Record<string, string> {
+        const csrfToken = getCookie('csrfToken')
+
+        if (!csrfToken) {
+            return {}
+        }
+
+        return { 'X-CSRF-Token': csrfToken }
+    }
+
     private refreshToken = () => {
         return this.request<UserResponseToken>('/auth/token', {
-            method: 'GET',
+            method: 'POST',
             credentials: 'include',
+            headers: this.getCsrfHeaders(),
         })
     }
 
@@ -153,6 +164,7 @@ export class WebLarekAPI extends Api implements IWebLarekAPI {
             headers: {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${getCookie('accessToken')}`,
+                ...this.getCsrfHeaders(),
             },
         }).then((data: IOrderResult) => data)
     }
@@ -167,6 +179,7 @@ export class WebLarekAPI extends Api implements IWebLarekAPI {
             headers: {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${getCookie('accessToken')}`,
+                ...this.getCsrfHeaders(),
             },
         })
     }
@@ -232,6 +245,7 @@ export class WebLarekAPI extends Api implements IWebLarekAPI {
             body: JSON.stringify(data),
             headers: {
                 'Content-Type': 'application/json',
+                ...this.getCsrfHeaders(),
             },
             credentials: 'include',
         })
@@ -243,6 +257,7 @@ export class WebLarekAPI extends Api implements IWebLarekAPI {
             body: JSON.stringify(data),
             headers: {
                 'Content-Type': 'application/json',
+                ...this.getCsrfHeaders(),
             },
             credentials: 'include',
         })
@@ -293,19 +308,20 @@ export class WebLarekAPI extends Api implements IWebLarekAPI {
 
     logoutUser = () => {
         return this.request<ServerResponse<unknown>>('/auth/logout', {
-            method: 'GET',
+            method: 'POST',
             credentials: 'include',
+            headers: this.getCsrfHeaders(),
         })
     }
 
     createProduct = (data: Omit<IProduct, '_id'>) => {
-        console.log(data)
         return this.requestWithRefresh<IProduct>('/product', {
             method: 'POST',
             body: JSON.stringify(data),
             headers: {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${getCookie('accessToken')}`,
+                ...this.getCsrfHeaders(),
             },
         }).then((data: IProduct) => ({
             ...data,
@@ -322,6 +338,7 @@ export class WebLarekAPI extends Api implements IWebLarekAPI {
             body: data,
             headers: {
                 Authorization: `Bearer ${getCookie('accessToken')}`,
+                ...this.getCsrfHeaders(),
             },
         }).then((data) => ({
             ...data,
@@ -336,6 +353,7 @@ export class WebLarekAPI extends Api implements IWebLarekAPI {
             headers: {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${getCookie('accessToken')}`,
+                ...this.getCsrfHeaders(),
             },
         }).then((data: IProduct) => ({
             ...data,
@@ -351,6 +369,7 @@ export class WebLarekAPI extends Api implements IWebLarekAPI {
             method: 'DELETE',
             headers: {
                 Authorization: `Bearer ${getCookie('accessToken')}`,
+                ...this.getCsrfHeaders(),
             },
         })
     }

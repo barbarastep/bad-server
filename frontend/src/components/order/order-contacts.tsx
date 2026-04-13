@@ -38,10 +38,10 @@ export function OrderContacts() {
             email: orderPersistData.email,
             phone: orderPersistData.phone,
         })
-    }, [orderPersistData])
+    }, [orderPersistData, setValuesForm])
 
     const handleEditInputChange = (value: string) => {
-        setValuesForm({ ...values, comment: value })
+        setValuesForm({ comment: value })
     }
 
     const handleFormSubmit = (e: SyntheticEvent<HTMLFormElement>) => {

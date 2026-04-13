@@ -13,6 +13,9 @@
   },
   "author": "< Укажите здесь автора работы >",
   "license": "ISC",
+  "overrides": {
+    "brace-expansion": "^1.1.13"
+  },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.7",
@@ -29,7 +32,7 @@
     "eslint": "^8.56.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-import": "^2.32.0",
     "prettier": "^3.3.3",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
@@ -39,7 +42,7 @@
     "@faker-js/faker": "^8.4.1",
     "@types/jsonwebtoken": "^9.0.6",
     "bcryptjs": "^2.4.3",
-    "celebrate": "^15.0.3",
+    "celebrate": "^12.1.2",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

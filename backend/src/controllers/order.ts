@@ -1,10 +1,12 @@
 import { NextFunction, Request, Response } from 'express'
 import { FilterQuery, Error as MongooseError, Types } from 'mongoose'
+import validator from 'validator'
 import BadRequestError from '../errors/bad-request-error'
 import NotFoundError from '../errors/not-found-error'
-import Order, { IOrder } from '../models/order'
+import Order, { IOrder, StatusType } from '../models/order'
 import Product, { IProduct } from '../models/product'
 import User from '../models/user'
+import { getDateQueryValue, getNumberQueryValue, getSafeSearchRegex, getSingleQueryValue } from '../utils/request'
 
 // eslint-disable-next-line max-len
 // GET /orders?page=2&limit=5&sort=totalAmount&order=desc&orderDateFrom=2024-07-01&orderDateTo=2024-08-01&status=delivering&totalAmountFrom=100&totalAmountTo=1000&search=%2B1
@@ -15,28 +17,29 @@ export const getOrders = async (
     next: NextFunction
 ) => {
     try {
-        const {
-            page = 1,
-            limit = 10,
-            sortField = 'createdAt',
-            sortOrder = 'desc',
-            status,
-            totalAmountFrom,
-            totalAmountTo,
-            orderDateFrom,
-            orderDateTo,
-            search,
-        } = req.query
+        const page = getNumberQueryValue(req.query.page, 1, {
+            min: 1,
+            max: 1000,
+        })
+        const limit = getNumberQueryValue(req.query.limit, 10, {
+            min: 1,
+            max: 10,
+        })
+        const sortField =
+            getSingleQueryValue(req.query.sortField) || 'createdAt'
+        const sortOrder =
+            getSingleQueryValue(req.query.sortOrder) === 'asc' ? 'asc' : 'desc'
+        const status = getSingleQueryValue(req.query.status)
+        const totalAmountFrom = getSingleQueryValue(req.query.totalAmountFrom)
+        const totalAmountTo = getSingleQueryValue(req.query.totalAmountTo)
+        const orderDateFrom = getDateQueryValue(req.query.orderDateFrom)
+        const orderDateTo = getDateQueryValue(req.query.orderDateTo)
+        const search = getSingleQueryValue(req.query.search)
 
         const filters: FilterQuery<Partial<IOrder>> = {}
 
-        if (status) {
-            if (typeof status === 'object') {
-                Object.assign(filters, status)
-            }
-            if (typeof status === 'string') {
-                filters.status = status
-            }
+        if (status && Object.values(StatusType).includes(status as StatusType)) {
+            filters.status = status
         }
 
         if (totalAmountFrom) {
@@ -56,14 +59,14 @@ export const getOrders = async (
         if (orderDateFrom) {
             filters.createdAt = {
                 ...filters.createdAt,
-                $gte: new Date(orderDateFrom as string),
+                $gte: orderDateFrom,
             }
         }
 
         if (orderDateTo) {
             filters.createdAt = {
                 ...filters.createdAt,
-                $lte: new Date(orderDateTo as string),
+                $lte: orderDateTo,
             }
         }
 
@@ -90,28 +93,40 @@ export const getOrders = async (
         ]
 
         if (search) {
-            const searchRegex = new RegExp(search as string, 'i')
+            const searchRegex = getSafeSearchRegex(search)
             const searchNumber = Number(search)
 
-            const searchConditions: any[] = [{ 'products.title': searchRegex }]
+            const searchConditions: any[] = []
+
+            if (searchRegex) {
+                searchConditions.push({ 'products.title': searchRegex })
+            }
 
             if (!Number.isNaN(searchNumber)) {
                 searchConditions.push({ orderNumber: searchNumber })
             }
 
-            aggregatePipeline.push({
-                $match: {
-                    $or: searchConditions,
-                },
-            })
-
-            filters.$or = searchConditions
+            if (searchConditions.length) {
+                aggregatePipeline.push({
+                    $match: {
+                        $or: searchConditions,
+                    },
+                })
+            }
         }
 
         const sort: { [key: string]: any } = {}
+        const allowedSortFields = new Set([
+            'createdAt',
+            'status',
+            'totalAmount',
+            'orderNumber',
+        ])
 
-        if (sortField && sortOrder) {
-            sort[sortField as string] = sortOrder === 'desc' ? -1 : 1
+        if (allowedSortFields.has(sortField)) {
+            sort[sortField] = sortOrder === 'desc' ? -1 : 1
+        } else {
+            sort.createdAt = -1
         }
 
         aggregatePipeline.push(
@@ -156,10 +171,18 @@ export const getOrdersCurrentUser = async (
 ) => {
     try {
         const userId = res.locals.user._id
-        const { search, page = 1, limit = 5 } = req.query
+        const search = getSingleQueryValue(req.query.search)
+        const page = getNumberQueryValue(req.query.page, 1, {
+            min: 1,
+            max: 1000,
+        })
+        const limit = getNumberQueryValue(req.query.limit, 5, {
+            min: 1,
+            max: 10,
+        })
         const options = {
-            skip: (Number(page) - 1) * Number(limit),
-            limit: Number(limit),
+            skip: (page - 1) * limit,
+            limit,
         }
 
         const user = await User.findById(userId)
@@ -184,18 +207,21 @@ export const getOrdersCurrentUser = async (
         let orders = user.orders as unknown as IOrder[]
 
         if (search) {
-            // если не экранировать то получаем Invalid regular expression: /+1/i: Nothing to repeat
-            const searchRegex = new RegExp(search as string, 'i')
+            const searchRegex = getSafeSearchRegex(search)
             const searchNumber = Number(search)
-            const products = await Product.find({ title: searchRegex })
-            const productIds = products.map((product) => product._id)
+            const productIds = searchRegex
+                ? (
+                      await Product.find(
+                          { title: searchRegex },
+                          { _id: 1 }
+                      )
+                  ).map((product) => product._id)
+                : []
 
             orders = orders.filter((order) => {
-                // eslint-disable-next-line max-len
                 const matchesProductTitle = order.products.some((product) =>
                     productIds.some((id) => id.equals(product._id))
                 )
-                // eslint-disable-next-line max-len
                 const matchesOrderNumber =
                     !Number.isNaN(searchNumber) &&
                     order.orderNumber === searchNumber
@@ -205,7 +231,7 @@ export const getOrdersCurrentUser = async (
         }
 
         const totalOrders = orders.length
-        const totalPages = Math.ceil(totalOrders / Number(limit))
+        const totalPages = Math.ceil(totalOrders / limit)
 
         orders = orders.slice(options.skip, options.skip + options.limit)
 
@@ -214,8 +240,8 @@ export const getOrdersCurrentUser = async (
             pagination: {
                 totalOrders,
                 totalPages,
-                currentPage: Number(page),
-                pageSize: Number(limit),
+                currentPage: page,
+                pageSize: limit,
             },
         })
     } catch (error) {
@@ -293,6 +319,8 @@ export const createOrder = async (
         const userId = res.locals.user._id
         const { address, payment, phone, total, email, items, comment } =
             req.body
+        const safeComment =
+            typeof comment === 'string' ? validator.escape(comment) : ''
 
         items.forEach((id: Types.ObjectId) => {
             const product = products.find((p) => p._id.equals(id))
@@ -315,7 +343,7 @@ export const createOrder = async (
             payment,
             phone,
             email,
-            comment,
+            comment: safeComment,
             customer: userId,
             deliveryAddress: address,
         })

@@ -6,7 +6,9 @@ import {
 } from '../../services/slice/customers'
 import { fetchCustomersWithFilters } from '../../services/slice/customers/thunk'
 import { AppRoute } from '../../utils/constants'
+import { FiltersCustomers } from '../../services/slice/customers/type'
 import Filter from '../filter'
+import { FilterValue } from '../filter/helpers/types'
 import styles from './admin.module.scss'
 import { customersFilterFields } from './helpers/customersFilterFields'
 
@@ -18,15 +20,28 @@ export default function AdminFilterCustomers() {
     const filterCustomersOption = useSelector(
         customersSelector.selectFilterOption
     )
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
 
-    const handleFilter = (filters: Record<string, any>) => {
-        dispatch(updateFilter({ ...filters }))
+    const handleFilter = (filters: Record<string, FilterValue>) => {
+        const normalizedFilters = Object.entries(filters).reduce<
+            Partial<FiltersCustomers>
+        >((acc, [key, value]) => {
+            if (typeof value === 'object' && value) {
+                acc[key as keyof FiltersCustomers] = value.value as never
+            } else if (typeof value !== 'undefined') {
+                acc[key as keyof FiltersCustomers] = value as never
+            }
+
+            return acc
+        }, {})
+
+        dispatch(updateFilter(normalizedFilters))
         const queryParams: { [key: string]: string } = {}
         Object.entries(filters).forEach(([key, value]) => {
             if (value) {
                 queryParams[key] =
-                    typeof value === 'object' ? value.value : value.toString()
+                    typeof value === 'object'
+                        ? value.value.toString()
+                        : value.toString()
             }
         })
         setSearchParams(queryParams)
