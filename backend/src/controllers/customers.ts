@@ -1,7 +1,6 @@
 import { NextFunction, Request, Response } from 'express'
 import { FilterQuery } from 'mongoose'
 import NotFoundError from '../errors/not-found-error'
-import Order from '../models/order'
 import User, { IUser } from '../models/user'
 import { getDateQueryValue, getNumberQueryValue, getSafeSearchRegex, getSingleQueryValue } from '../utils/request'
 
@@ -123,18 +122,9 @@ export const getCustomers = async (
             const searchRegex = getSafeSearchRegex(search)
 
             if (searchRegex) {
-                const orders = await Order.find(
-                    {
-                        $or: [{ deliveryAddress: searchRegex }],
-                    },
-                    '_id'
-                )
-
-                const orderIds = orders.map((order) => order._id)
-
                 filters.$or = [
                     { name: searchRegex },
-                    { lastOrder: { $in: orderIds } },
+                    { email: searchRegex },
                 ]
             }
         }
